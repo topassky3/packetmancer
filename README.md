@@ -5,6 +5,7 @@ Del .pcap al diagnóstico accionable en un solo comando.
 PacketMancer es una herramienta de código abierto para el análisis de red, escrita en Rust. Nace de la frustración de pasar horas buscando la aguja en el pajar digital que son las capturas de paquetes. Su misión es automatizar el primer nivel de diagnóstico, permitiendo a los ingenieros enfocarse en resolver problemas, no en encontrarlos.
 
 Este proyecto se está construyendo en público. Puedes seguir el viaje, los desafíos técnicos y las decisiones de diseño en mi blog: La Verdad en los Paquetes (Substack).
+
 ✨ Características Principales (MVP Actual)
 
     Análisis de Estado de TCP: Identifica problemas de salud en conversaciones TCP, incluyendo:
@@ -24,32 +25,38 @@ Este proyecto se está construyendo en público. Puedes seguir el viaje, los des
     Salida Dual: Ofrece un reporte legible para humanos en la consola y una salida estructurada en formato JSON para la integración con otros scripts y herramientas.
 
 🚀 Empezando
+
 Prerrequisitos
 
 PacketMancer está construido en Rust y depende de libpcap.
 
     Instalar Rust: Si aún no lo tienes, instálalo a través de rustup:
+    Bash
 
-    curl --proto '=https' --tlsv1.2 -sSf [https://sh.rustup.rs](https://sh.rustup.rs) | sh
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-    Instalar libpcap (dependencia de sistema):
+Instalar libpcap (dependencia de sistema):
 
-        En Debian/Ubuntu:
+    En Debian/Ubuntu:
+    Bash
 
-        sudo apt-get update && sudo apt-get install -y libpcap-dev
+sudo apt-get update && sudo apt-get install -y libpcap-dev
 
-        En Fedora/CentOS:
+En Fedora/CentOS:
+Bash
 
         sudo dnf install -y libpcap-devel
 
 Instalación y Compilación
 
     Clona el repositorio:
+    Bash
 
-    git clone [https://github.com/topassky3/packetmancer.git](https://github.com/topassky3/packetmancer.git)
-    cd packetmancer
+git clone https://github.com/topassky3/packetmancer.git
+cd packetmancer
 
-    Compila el proyecto:
+Compila el proyecto:
+Bash
 
     cargo build --release
 
@@ -60,6 +67,7 @@ Instalación y Compilación
 Ejecuta PacketMancer desde la línea de comandos, pasándole la ruta a un archivo de captura.
 
 Comando Básico:
+Bash
 
 cargo run --release -- --file /ruta/a/tu/captura.pcap
 
@@ -73,9 +81,12 @@ Opciones Disponibles:
 
 Ejemplo de Ejecución
 
+Bash
+
 cargo run --release -- --file captures/tcp-ecn-sample.pcap --top 2
 
 Salida en Consola:
+Plaintext
 
 Iniciando análisis del archivo: captures/tcp-ecn-sample.pcap
 
@@ -90,6 +101,7 @@ Top 2 conversaciones por volumen de paquetes:
 --- ANÁLISIS COMPLETADO ---
 
 Salida en JSON (con --json report.json):
+JSON
 
 {
   "summary": {
@@ -133,6 +145,7 @@ Salida en JSON (con --json report.json):
     Pull Requests: Si quieres contribuir con código, ¡excelente! Por favor, abre un issue primero para discutir el cambio.
 
 Si el proyecto te parece útil o interesante, considera darle una ⭐️ estrella en GitHub. ¡Significa mucho!
+
 📜 Licencia
 
 Este proyecto está bajo la Licencia MIT.
