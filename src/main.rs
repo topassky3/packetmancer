@@ -1,13 +1,15 @@
-/* ===================================================================
- * Filename:  src/main.rs
- *
- * Descripción:  Punto de entrada principal de PacketMancer.
- * ===================================================================
- */
+// src/main.rs
 
 use std::path::Path;
 use clap::Parser;
 use pcap::Capture;
+
+// Le decimos a Rust que use nuestros nuevos módulos.
+mod detectors;
+mod network;
+
+// Importamos nuestro nuevo detector.
+use detectors::tcp_health::TcpHealthDetector;
 
 #[derive(Parser, Debug)]
 #[command(version, about = "PacketMancer - Analizador de Red Inteligente", long_about = None)]
@@ -21,9 +23,8 @@ fn main() {
     println!("Iniciando análisis del archivo: {}", &args.file);
 
     match process_pcap_file(&args.file) {
-        Ok(packet_count) => {
+        Ok(()) => {
             println!("\n--- ANÁLISIS COMPLETADO ---");
-            println!("Se han procesado un total de {} paquetes.", packet_count);
         }
         Err(e) => {
             eprintln!("\n--- ERROR ---");
@@ -32,8 +33,8 @@ fn main() {
     }
 }
 
-/// Esta función utiliza la librería `pcap` para leer el archivo.
-fn process_pcap_file(file_path_str: &str) -> Result<u32, String> {
+/// Esta función ahora orquesta el análisis usando los detectores.
+fn process_pcap_file(file_path_str: &str) -> Result<(), String> {
     let path = Path::new(file_path_str);
     if !path.exists() {
         return Err(format!("El archivo no existe en la ruta especificada: {}", file_path_str));
@@ -42,11 +43,17 @@ fn process_pcap_file(file_path_str: &str) -> Result<u32, String> {
     let mut capture = Capture::from_file(path)
         .map_err(|e| format!("Error al abrir la captura: {}", e))?;
 
-    let mut packet_count = 0;
+    // 1. Creamos una instancia de nuestro detector.
+    let mut tcp_detector = TcpHealthDetector::new();
 
-    while let Ok(_packet) = capture.next_packet() {
-        packet_count += 1;
+    // 2. Iteramos sobre cada paquete.
+    while let Ok(packet) = capture.next_packet() {
+        // 3. Pasamos los datos crudos del paquete a nuestro detector.
+        tcp_detector.on_packet(packet.data);
     }
 
-    Ok(packet_count)
+    // 4. Al final, le pedimos al detector que genere su reporte.
+    tcp_detector.report();
+
+    Ok(())
 }

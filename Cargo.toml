@@ -2,8 +2,6 @@
 # Filename:  Cargo.toml
 #
 # Descripción:  Archivo de configuración de Cargo.
-# CORRECCIÓN FINAL: Cambiamos la edición a "2021" para que
-# sea compatible con la versión de Rust instalada por 'apt'.
 # ===================================================================
 
 [package]
@@ -14,3 +12,4 @@ edition = "2021"
 [dependencies]
 pcap = "2.1.0"
 clap = { version = "4.5.4", features = ["derive"] }
+etherparse = "0.14.3"
