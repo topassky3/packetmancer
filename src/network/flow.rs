@@ -1,5 +1,4 @@
-// src/network/flow.rs
-use std::net::{IpAddr, Ipv4Addr}; // <-- agrega Ipv4Addr
+use std::net::{IpAddr, Ipv4Addr};
 
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 pub struct Flow {
@@ -20,7 +19,6 @@ impl Flow {
     }
 }
 
-// <-- agrega esta impl
 impl Default for Flow {
     fn default() -> Self {
         Flow {

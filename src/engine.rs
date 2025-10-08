@@ -1,6 +1,7 @@
 use pcap::Capture;
 use serde_json::{json, Value};
 use std::path::Path;
+use std::time::Instant;
 
 pub trait Detector {
     fn name(&self) -> &'static str;
@@ -14,7 +15,9 @@ pub struct Engine {
 
 impl Engine {
     pub fn new() -> Self {
-        Self { detectors: Vec::new() }
+        Self {
+            detectors: Vec::new(),
+        }
     }
 
     pub fn register<D: Detector + 'static>(&mut self, detector: D) {
@@ -24,11 +27,14 @@ impl Engine {
     pub fn run(&mut self, file_path: &str) -> Result<Value, String> {
         let p = Path::new(file_path);
         if !p.exists() {
-            return Err(format!("El archivo no existe: {}", file_path));
+            return Err(format!("El archivo no existe: {file_path}"));
         }
 
-        let mut cap = Capture::from_file(p)
-            .map_err(|e| format!("Error al abrir la captura: {}", e))?;
+        let file_bytes = std::fs::metadata(p).map(|m| m.len()).unwrap_or(0);
+
+        let start = Instant::now();
+        let mut cap =
+            Capture::from_file(p).map_err(|e| format!("Error al abrir la captura: {e}"))?;
 
         let mut packets_total: u64 = 0;
         while let Ok(pkt) = cap.next_packet() {
@@ -37,6 +43,14 @@ impl Engine {
                 d.on_packet(pkt.data);
             }
         }
+        let duration_ms = start.elapsed().as_millis() as u64;
+
+        let duration_secs = (duration_ms as f64) / 1000.0;
+        let throughput_mbps = if duration_secs > 0.0 {
+            (file_bytes as f64 * 8.0) / duration_secs / 1_000_000.0
+        } else {
+            0.0
+        };
 
         let mut det_map = serde_json::Map::new();
         for d in self.detectors.iter_mut() {
@@ -44,7 +58,14 @@ impl Engine {
         }
 
         Ok(json!({
-            "summary": { "file": file_path, "packets_total": packets_total },
+            "summary": {
+                "schema": "v1",
+                "file": file_path,
+                "packets_total": packets_total,
+                "duration_ms": duration_ms,
+                "bytes_total": file_bytes,
+                "throughput_mbps": throughput_mbps
+            },
             "detectors": det_map
         }))
     }
