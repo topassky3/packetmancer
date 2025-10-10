@@ -5,7 +5,10 @@ use std::time::Instant;
 
 pub trait Detector {
     fn name(&self) -> &'static str;
-    fn on_packet(&mut self, data: &[u8]);
+
+    /// Timestamp del paquete en microsegundos desde epoch (pcap header)
+    fn on_packet(&mut self, data: &[u8], ts_micros: u64);
+
     fn finalize(&mut self) -> Value;
 }
 
@@ -39,8 +42,14 @@ impl Engine {
         let mut packets_total: u64 = 0;
         while let Ok(pkt) = cap.next_packet() {
             packets_total += 1;
+
+            // timestamp del paquete (pcap timeval: segundos + microsegundos) SIN unsafe
+            let secs = pkt.header.ts.tv_sec as u64;
+            let usecs = pkt.header.ts.tv_usec as u64;
+            let ts_micros = secs.saturating_mul(1_000_000).saturating_add(usecs);
+
             for d in self.detectors.iter_mut() {
-                d.on_packet(pkt.data);
+                d.on_packet(pkt.data, ts_micros);
             }
         }
         let duration_ms = start.elapsed().as_millis() as u64;

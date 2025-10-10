@@ -2,6 +2,8 @@
 
 **Del .pcap al diagnóstico accionable en un solo comando.**
 
+
+[![CI](https://github.com/topassky3/packetmancer/actions/workflows/ci.yml/badge.svg)](https://github.com/topassky3/packetmancer/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-%23000000.svg?style=flat&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 
@@ -144,7 +146,7 @@ cargo run -- --file captures/tcp-ecn-sample.pcap --json report.json
       "conversations_total": 1,
       "top_by_severity": [
         {
-          "flow": "1.1.23.3:46557  1.1.12.1:80/TCP",
+          "flow": "1.1.23.3:46557 <-> 1.1.12.1:80/TCP",
           "score": { "value": 80, "level": "MEDIA" },
           "reasons": [ "eventos de ACK duplicado (≥3) (29)" ],
           "c2s": {

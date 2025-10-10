@@ -108,6 +108,26 @@ fn print_human_tcp_health(report: &Value, top_n: usize) {
                 s2c["packets"], s2c["retransmissions"], s2c["out_of_order"], s2c["zero_window_events"], s2c["duplicate_ack_events"]
             );
 
+            // RTT si hay muestras
+            let c2s_rtt = &c2s["rtt_ms"];
+            let s2c_rtt = &s2c["rtt_ms"];
+            let c2s_n = c2s_rtt.get("samples").and_then(|v| v.as_u64()).unwrap_or(0);
+            let s2c_n = s2c_rtt.get("samples").and_then(|v| v.as_u64()).unwrap_or(0);
+            if c2s_n > 0 || s2c_n > 0 {
+                println!(
+                    "    RTT C->S: p50={:.1} ms, p95={:.1} ms (n={})",
+                    c2s_rtt.get("p50").and_then(|v| v.as_f64()).unwrap_or(0.0),
+                    c2s_rtt.get("p95").and_then(|v| v.as_f64()).unwrap_or(0.0),
+                    c2s_n
+                );
+                println!(
+                    "    RTT S->C: p50={:.1} ms, p95={:.1} ms (n={})",
+                    s2c_rtt.get("p50").and_then(|v| v.as_f64()).unwrap_or(0.0),
+                    s2c_rtt.get("p95").and_then(|v| v.as_f64()).unwrap_or(0.0),
+                    s2c_n
+                );
+            }
+
             if let Some(reasons) = entry["reasons"].as_array() {
                 if !reasons.is_empty() {
                     let pretty: Vec<String> = reasons
