@@ -2,6 +2,7 @@
 name = "packetmancer"
 version = "0.1.0"
 edition = "2021"
+build = "build.rs"
 
 [dependencies]
 pcap = "2.1.0"

@@ -1,7 +1,29 @@
-/target
-**/*.pcap
-**/*.pcapng
-report.json
+# Rust / Cargo
+/target/
+**/*.rlib
+**/*.rmeta
+**/*.d
+**/*.pdb
+**/*.dll
+**/*.exe
+
+# Registros locales / artefactos
 *.log
+build.log
+report*.json
+reporte*.json
+
+# Capturas grandes
+captures/*
+!captures/tcp-ecn-sample.pcap
+!captures/telnet-cooked.pcap
+!captures/http.cap
+
+# IDEs / OS
+.vscode/
+.idea/
 .DS_Store
 Thumbs.db
+
+# GitHub Actions cache (si aplica)
+*.sbom.json
