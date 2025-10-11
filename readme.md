@@ -310,3 +310,7 @@ Este proyecto está bajo la **Licencia MIT**.
 <div align="center">
   <sub>Construido con ❤️ y Rust 🦀</sub>
 </div>
+
+
+
+Add-Content -Path README.md -Value "`n> Prueba rulesets: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
