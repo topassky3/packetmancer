@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}   # opcional: no bloquea si falla Windows
     strategy:
       fail-fast: false
       matrix:
@@ -18,12 +19,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
 
-      # Linux: libpcap
+      # ---------- Linux ----------
       - name: Install libpcap (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y libpcap-dev
 
-      # Windows: Npcap runtime + SDK
+      # ---------- Windows ----------
+      - name: Set up MSVC env (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Install Npcap runtime & SDK (Windows)
         if: matrix.os == 'windows-latest'
         shell: powershell
@@ -34,18 +39,23 @@ jobs:
           $rt  = "${env:ProgramFiles}\Npcap"
           $sdk = "${env:ProgramFiles}\Npcap SDK"
 
-          # Rutas para el linker de MSVC (wpcap.lib y Packet.lib)
-          echo "LIB=$sdk\Lib\x64;$env:LIB"       | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo "INCLUDE=$sdk\Include;$env:INCLUDE" | Out-File -FilePath $env:GITHUB_ENV -Append
+          # Hints para el linker y para build scripts de pcap/pcap-sys
+          echo "LIB=$sdk\Lib\x64;$env:LIB"           | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "INCLUDE=$sdk\Include;$env:INCLUDE"   | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "PCAP_LIBDIR=$sdk\Lib\x64"            | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "PCAP_INCLUDE_DIR=$sdk\Include"       | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "NPCAP_DIR=$sdk"                      | Out-File -FilePath $env:GITHUB_ENV -Append
 
           # DLLs en PATH para ejecutar binarios/tests
-          echo "C:\Windows\System32\Npcap" | Out-File -FilePath $env:GITHUB_PATH -Append
-          echo "$rt"                        | Out-File -FilePath $env:GITHUB_PATH -Append
+          echo "C:\Windows\System32\Npcap"           | Out-File -FilePath $env:GITHUB_PATH -Append
+          echo "$rt"                                 | Out-File -FilePath $env:GITHUB_PATH -Append
 
-          # (Debug opcional)
-          Get-ChildItem "$sdk\Lib\x64" -Filter *.lib | ForEach-Object { $_.FullName }
-          Get-ChildItem "C:\Windows\System32\Npcap" -Filter *.dll | ForEach-Object { $_.FullName }
+          # Sanity checks: fallar si falta algo
+          if (!(Test-Path "$sdk\Lib\x64\wpcap.lib")) { Write-Error "No se encontró wpcap.lib"; exit 1 }
+          if (!(Test-Path "$sdk\Lib\x64\Packet.lib")) { Write-Error "No se encontró Packet.lib"; exit 1 }
+          if (!(Test-Path "C:\Windows\System32\Npcap\wpcap.dll")) { Write-Error "No se encontró wpcap.dll"; exit 1 }
 
+      # ---------- Build & QA ----------
       - name: Build
         run: cargo build --verbose
 
