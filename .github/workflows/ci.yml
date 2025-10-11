@@ -17,9 +17,25 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
 
+      # Linux: libpcap
       - name: Install libpcap (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y libpcap-dev
+
+      # Windows: Npcap runtime + SDK (para compilar y ejecutar tests)
+      - name: Install Npcap runtime & SDK (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: powershell
+        run: |
+          choco install npcap -y --params '"/winpcap_mode=yes /npf_startup=yes"'
+          choco install npcap-sdk -y
+          $sdk = "${env:ProgramFiles}\Npcap SDK"
+          # Rutas de include y lib para el linkeo de la crate `pcap`
+          echo "INCLUDE=$sdk\Include" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "LIB=$sdk\Lib\x64" | Out-File -FilePath $env:GITHUB_ENV -Append
+          # Asegurar que wpcap.dll esté en PATH en tiempo de ejecución
+          echo "C:\Windows\System32\Npcap" | Out-File -FilePath $env:GITHUB_PATH -Append
+          echo "$sdk\Lib\x64"           | Out-File -FilePath $env:GITHUB_PATH -Append
 
       - name: Build
         run: cargo build --verbose
