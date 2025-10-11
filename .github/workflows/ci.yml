@@ -10,6 +10,7 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
 
@@ -22,20 +23,28 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y libpcap-dev
 
-      # Windows: Npcap runtime + SDK (para compilar y ejecutar tests)
+      # Windows: Npcap runtime + SDK
       - name: Install Npcap runtime & SDK (Windows)
         if: matrix.os == 'windows-latest'
         shell: powershell
         run: |
           choco install npcap -y --params '"/winpcap_mode=yes /npf_startup=yes"'
           choco install npcap-sdk -y
+
+          $rt  = "${env:ProgramFiles}\Npcap"
           $sdk = "${env:ProgramFiles}\Npcap SDK"
-          # Rutas de include y lib para el linkeo de la crate `pcap`
-          echo "INCLUDE=$sdk\Include" | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo "LIB=$sdk\Lib\x64" | Out-File -FilePath $env:GITHUB_ENV -Append
-          # Asegurar que wpcap.dll esté en PATH en tiempo de ejecución
+
+          # Rutas para el linker de MSVC (wpcap.lib y Packet.lib)
+          echo "LIB=$sdk\Lib\x64;$env:LIB"       | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "INCLUDE=$sdk\Include;$env:INCLUDE" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+          # DLLs en PATH para ejecutar binarios/tests
           echo "C:\Windows\System32\Npcap" | Out-File -FilePath $env:GITHUB_PATH -Append
-          echo "$sdk\Lib\x64"           | Out-File -FilePath $env:GITHUB_PATH -Append
+          echo "$rt"                        | Out-File -FilePath $env:GITHUB_PATH -Append
+
+          # (Debug opcional)
+          Get-ChildItem "$sdk\Lib\x64" -Filter *.lib | ForEach-Object { $_.FullName }
+          Get-ChildItem "C:\Windows\System32\Npcap" -Filter *.dll | ForEach-Object { $_.FullName }
 
       - name: Build
         run: cargo build --verbose
