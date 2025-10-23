@@ -8,6 +8,12 @@
 
 ---
 
+## 🎬 Demo rápida
+
+<p align="center">
+  <img src="assets/packetmancer-demo.min.gif" alt="Demostración de PacketMancer (CLI)">
+</p>
+
 ## 🎯 ¿Qué es PacketMancer?
 
 PacketMancer es una herramienta de código abierto para el análisis de red, escrita en Rust. Nace de la frustración de pasar horas buscando la aguja en el pajar digital que son las capturas de paquetes. Su misión es **automatizar el primer nivel de diagnóstico**, permitiendo a los ingenieros enfocarse en resolver problemas, no en encontrarlos.
@@ -310,3 +316,6 @@ Este proyecto está bajo la **Licencia MIT**.
 <div align="center">
   <sub>Construido con ❤️ y Rust 🦀</sub>
 </div>
+
+
+
