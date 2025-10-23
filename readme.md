@@ -16,6 +16,11 @@ Este proyecto se está construyendo en público. Puedes seguir el viaje, los des
 
 ---
 
+<p align="center">
+  <img src="assets/packetmancer-demo.min.gif" alt="Demostración de PacketMancer (CLI)">
+</p>
+
+
 ## ✨ Características Principales (MVP Actual)
 
 ### 🔍 Análisis de Salud TCP
