@@ -1,6 +1,11 @@
-# PacketMancer
+﻿# PacketMancer
 
-**Del .pcap al diagnóstico accionable en un solo comando.**
+<p align="center">
+  <img src="assets/packetmancer-demo.min.gif" alt="PacketMancer demo (CLI)" />
+</p>
+
+
+**Del .pcap al diagnÃ³stico accionable en un solo comando.**
 
 [![CI](https://github.com/topassky3/packetmancer/actions/workflows/ci.yml/badge.svg)](https://github.com/topassky3/packetmancer/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -8,41 +13,41 @@
 
 ---
 
-## 🎯 ¿Qué es PacketMancer?
+## ðŸŽ¯ Â¿QuÃ© es PacketMancer?
 
-PacketMancer es una herramienta de código abierto para el análisis de red, escrita en Rust. Nace de la frustración de pasar horas buscando la aguja en el pajar digital que son las capturas de paquetes. Su misión es **automatizar el primer nivel de diagnóstico**, permitiendo a los ingenieros enfocarse en resolver problemas, no en encontrarlos.
+PacketMancer es una herramienta de cÃ³digo abierto para el anÃ¡lisis de red, escrita en Rust. Nace de la frustraciÃ³n de pasar horas buscando la aguja en el pajar digital que son las capturas de paquetes. Su misiÃ³n es **automatizar el primer nivel de diagnÃ³stico**, permitiendo a los ingenieros enfocarse en resolver problemas, no en encontrarlos.
 
-Este proyecto se está construyendo en público. Puedes seguir el viaje, los desafíos técnicos y las decisiones de diseño en mi blog: **La Verdad en los Paquetes**.
+Este proyecto se estÃ¡ construyendo en pÃºblico. Puedes seguir el viaje, los desafÃ­os tÃ©cnicos y las decisiones de diseÃ±o en mi blog: **La Verdad en los Paquetes**.
 
 ---
 
-## ✨ Características Principales (MVP Actual)
+## âœ¨ CaracterÃ­sticas Principales (MVP Actual)
 
-### 🔍 Análisis de Salud TCP
+### ðŸ” AnÃ¡lisis de Salud TCP
 Identifica problemas de salud en conversaciones TCP, incluyendo:
-- **Retransmisiones** - Paquetes reenviados por pérdida
+- **Retransmisiones** - Paquetes reenviados por pÃ©rdida
 - **Paquetes Fuera de Orden** - Desorden en la secuencia TCP
-- **Eventos de Ventana Cero** - Bloqueos de flujo por congestión
-- **Eventos de ACK Duplicado** - Indicador de pérdida de paquetes (≥3 eventos)
+- **Eventos de Ventana Cero** - Bloqueos de flujo por congestiÃ³n
+- **Eventos de ACK Duplicado** - Indicador de pÃ©rdida de paquetes (â‰¥3 eventos)
 
-### 🎯 Sistema de Scoring por Severidad
-Clasifica conversaciones automáticamente:
-- **ALTA** (score ≥ 100): Problemas críticos que requieren atención inmediata
-- **MEDIA** (50-99): Degradación notable del rendimiento
-- **BAJA** (1-49): Anomalías menores
+### ðŸŽ¯ Sistema de Scoring por Severidad
+Clasifica conversaciones automÃ¡ticamente:
+- **ALTA** (score â‰¥ 100): Problemas crÃ­ticos que requieren atenciÃ³n inmediata
+- **MEDIA** (50-99): DegradaciÃ³n notable del rendimiento
+- **BAJA** (1-49): AnomalÃ­as menores
 
-### ⚡ Rendimiento
+### âš¡ Rendimiento
 - **Procesamiento en streaming**: Lee archivos `.pcap` y `.pcapng` sin cargar todo en memoria
-- **Análisis de capturas de varios GB** sin agotar recursos
-- **Motor modular**: Arquitectura extensible para añadir nuevos detectores (DNS, HTTP, etc.)
+- **AnÃ¡lisis de capturas de varios GB** sin agotar recursos
+- **Motor modular**: Arquitectura extensible para aÃ±adir nuevos detectores (DNS, HTTP, etc.)
 
-### 📊 Salida Dual
+### ðŸ“Š Salida Dual
 - **Reporte legible para humanos** en consola con colores y formato claro
-- **Salida estructurada en JSON** para integración con scripts y herramientas
+- **Salida estructurada en JSON** para integraciÃ³n con scripts y herramientas
 
 ---
 
-## 🚀 Empezando
+## ðŸš€ Empezando
 
 ### Requisitos
 
@@ -77,7 +82,7 @@ brew install libpcap
 ```powershell
 choco install npcap -y --params '"/winpcap_mode=yes /npf_startup=yes"'
 choco install npcap-sdk -y
-# (opcional) si el SDK no está en C:\NpcapSDK
+# (opcional) si el SDK no estÃ¡ en C:\NpcapSDK
 $env:NPCAP_SDK_DIR = "C:\Ruta\NpcapSDK"
 ```
 
@@ -92,21 +97,21 @@ cd packetmancer
 ```bash
 cargo build --release
 ```
-El binario quedará en `target/release/packetmancer` (o `.exe` en Windows).
+El binario quedarÃ¡ en `target/release/packetmancer` (o `.exe` en Windows).
 
-> **⚠️ Windows nativo (importante):** en varios entornos, la primera compilación necesita una consola **elevada**.  
-> Abre **PowerShell** como *“Ejecutar como administrador”* y ejecuta:
+> **âš ï¸ Windows nativo (importante):** en varios entornos, la primera compilaciÃ³n necesita una consola **elevada**.  
+> Abre **PowerShell** como *â€œEjecutar como administradorâ€* y ejecuta:
 > ```powershell
 > cargo build --release
 > ```
-> Si la compilación falla sin privilegios elevados (errores de permisos/enlace), vuelve a intentarlo con PowerShell **Administrador**.  
-> Asegúrate también de que el SDK exista en `C:\NpcapSDK\Lib\x64` o fija `NPCAP_SDK_DIR` como se indicó arriba.
+> Si la compilaciÃ³n falla sin privilegios elevados (errores de permisos/enlace), vuelve a intentarlo con PowerShell **Administrador**.  
+> AsegÃºrate tambiÃ©n de que el SDK exista en `C:\NpcapSDK\Lib\x64` o fija `NPCAP_SDK_DIR` como se indicÃ³ arriba.
 
 ---
 
-## 🖥️ Uso (CLI)
+## ðŸ–¥ï¸ Uso (CLI)
 
-### Comando Básico
+### Comando BÃ¡sico
 
 ```bash
 cargo run --release -- --file /ruta/a/tu/captura.pcap
@@ -114,11 +119,11 @@ cargo run --release -- --file /ruta/a/tu/captura.pcap
 
 ### Opciones Principales
 
-| Opción | Descripción |
+| OpciÃ³n | DescripciÃ³n |
 |--------|-------------|
 | `--file <PATH>` | Ruta al archivo `.pcap`/`.pcapng` **(obligatoria)** |
 | `--json <PATH>` | Exporta el reporte JSON a ese archivo |
-| `--top <N>` | Cuántos flujos mostrar en consola (por defecto: 5) |
+| `--top <N>` | CuÃ¡ntos flujos mostrar en consola (por defecto: 5) |
 
 ### Ejemplo Real
 
@@ -128,19 +133,19 @@ cargo run -- --file captures/tcp-ecn-sample.pcap --top 5
 
 **Salida (ejemplo):**
 ```
-Iniciando análisis del archivo: captures/tcp-ecn-sample.pcap
+Iniciando anÃ¡lisis del archivo: captures/tcp-ecn-sample.pcap
 
 --- Reporte del Detector de Salud TCP ---
-Archivo: captures/tcp-ecn-sample.pcap | Paquetes: 479 | Duración: 59 ms | Tasa: 16.13 Mbps | Schema: v1
+Archivo: captures/tcp-ecn-sample.pcap | Paquetes: 479 | DuraciÃ³n: 59 ms | Tasa: 16.13 Mbps | Schema: v1
 Se encontraron 1 conversaciones TCP distintas.
 
 Top 5 conversaciones por SEVERIDAD:
   - [MEDIA | score=80] 1.1.23.3:46557 <-> 1.1.12.1:80/TCP
-    -> C->S: Pkts: 309, Retrans.: 1, Fuera de Orden: 0, Ventana0: 0, DupACK(ev≥3): 29
-    <- S->C: Pkts: 170, Retrans.: 0, Fuera de Orden: 0, Ventana0: 0, DupACK(ev≥3): 0
-    Razones: eventos de ACK duplicado (≥3) (29)
+    -> C->S: Pkts: 309, Retrans.: 1, Fuera de Orden: 0, Ventana0: 0, DupACK(evâ‰¥3): 29
+    <- S->C: Pkts: 170, Retrans.: 0, Fuera de Orden: 0, Ventana0: 0, DupACK(evâ‰¥3): 0
+    Razones: eventos de ACK duplicado (â‰¥3) (29)
 
---- ANÁLISIS COMPLETADO ---
+--- ANÃLISIS COMPLETADO ---
 ```
 
 ### Exportar a JSON
@@ -174,55 +179,55 @@ cargo run -- --file captures/tcp-ecn-sample.pcap --json report.json
 
 ---
 
-## 🪟 Guía Rápida WSL (Windows)
+## ðŸªŸ GuÃ­a RÃ¡pida WSL (Windows)
 
-Si tu repositorio está en Windows (por ejemplo: `C:\Users\usuario\...\packetmancer`), accede desde WSL/Ubuntu:
+Si tu repositorio estÃ¡ en Windows (por ejemplo: `C:\Users\usuario\...\packetmancer`), accede desde WSL/Ubuntu:
 
 ```bash
 cd "/mnt/c/Users/usuario/Desktop/packetmancer"
 cargo run -- --file captures/tcp-ecn-sample.pcap
 ```
 
-**💡 Tip:** Si ves errores de permisos al acceder a rutas de Windows, revisa comillas y espacios, o mueve las capturas a una ruta sin espacios.
+**ðŸ’¡ Tip:** Si ves errores de permisos al acceder a rutas de Windows, revisa comillas y espacios, o mueve las capturas a una ruta sin espacios.
 
 ---
 
-## 🧱 Estructura del Proyecto
+## ðŸ§± Estructura del Proyecto
 
 ```
 src/
-├─ main.rs                # CLI, parseo de flags, salida humana
-├─ engine.rs              # Engine: registro y orquestación de detectores
-├─ detectors/
-│  └─ tcp_health.rs       # Detector de Salud TCP (scoring, métricas, JSON, tests)
-└─ network/
-   ├─ mod.rs
-   └─ flow.rs             # Definición de Flow (5-tupla simplificada) + reverse()
+â”œâ”€ main.rs                # CLI, parseo de flags, salida humana
+â”œâ”€ engine.rs              # Engine: registro y orquestaciÃ³n de detectores
+â”œâ”€ detectors/
+â”‚  â””â”€ tcp_health.rs       # Detector de Salud TCP (scoring, mÃ©tricas, JSON, tests)
+â””â”€ network/
+   â”œâ”€ mod.rs
+   â””â”€ flow.rs             # DefiniciÃ³n de Flow (5-tupla simplificada) + reverse()
 ```
 
 ---
 
-## 🗺️ Roadmap
+## ðŸ—ºï¸ Roadmap
 
 ### Inmediato (MVP)
 
-- [ ] RTT/latencia (p50/p95) por conversación (Story #2)
+- [ ] RTT/latencia (p50/p95) por conversaciÃ³n (Story #2)
 - [ ] Detectores DNS (latencia, NXDOMAIN, DGA/punycode) y Conversations (top por bytes/paquetes)
 - [ ] CLI avanzado: Filtros (`--filter`, `--dns-latency-threshold`, `--no-detector tcp_health`) y perfiles
 - [ ] Releases: Binarios multiplataforma
 
-### Filosofía de Desarrollo
+### FilosofÃ­a de Desarrollo
 
-**Cero falsos positivos** siempre que sea posible. Umbrales conservadores y precisión sobre ruido.
+**Cero falsos positivos** siempre que sea posible. Umbrales conservadores y precisiÃ³n sobre ruido.
 
 ---
 
-## 🧪 Calidad del Código (Desarrollo)
+## ðŸ§ª Calidad del CÃ³digo (Desarrollo)
 
-Antes de hacer un commit, asegúrate de que todo pase:
+Antes de hacer un commit, asegÃºrate de que todo pase:
 
 ```bash
-# Formateo automático
+# Formateo automÃ¡tico
 cargo fmt
 
 # Linting estricto
@@ -234,42 +239,42 @@ cargo test --all-features
 
 ---
 
-## 🤝 Contribuir
+## ðŸ¤ Contribuir
 
-¡Este es un proyecto de código abierto y las contribuciones son bienvenidas!
+Â¡Este es un proyecto de cÃ³digo abierto y las contribuciones son bienvenidas!
 
 ### Reportar Bugs
 Abre un **issue** con:
 - Pasos para reproducir el problema
 - Adjunta archivos `.pcap` si es posible (o pcaps reducidos/anonimizados)
-- Versión de Rust y sistema operativo
+- VersiÃ³n de Rust y sistema operativo
 
 ### Sugerir Funcionalidades
-¿Tienes una idea para un nuevo detector o regla? ¡Comenta tu propuesta en un issue!
+Â¿Tienes una idea para un nuevo detector o regla? Â¡Comenta tu propuesta en un issue!
 
 ### Pull Requests
 1. **Abre un issue** primero para discutir el cambio
-2. Asegúrate de que `fmt`, `clippy` y `test` estén en verde
-3. Describe claramente qué problema resuelve tu PR
+2. AsegÃºrate de que `fmt`, `clippy` y `test` estÃ©n en verde
+3. Describe claramente quÃ© problema resuelve tu PR
 
 ---
 
-## 🧪 CI / Compatibilidad
+## ðŸ§ª CI / Compatibilidad
 
-- **Linux (Ubuntu)**: ✅ Build · ✅ Clippy · ✅ Tests
-- **macOS**: ✅ Build · ✅ Clippy · ✅ Tests
-- **Windows (experimental)**: ✅ Build · ✅ Clippy · ❌ Tests (deshabilitados por ahora)  
+- **Linux (Ubuntu)**: âœ… Build Â· âœ… Clippy Â· âœ… Tests
+- **macOS**: âœ… Build Â· âœ… Clippy Â· âœ… Tests
+- **Windows (experimental)**: âœ… Build Â· âœ… Clippy Â· âŒ Tests (deshabilitados por ahora)  
   Recomendado usar **WSL** para la mejor experiencia.
 
 **Notas CI**
-- La matriz de CI está configurada sin *fail-fast*.
+- La matriz de CI estÃ¡ configurada sin *fail-fast*.
 - El job de Windows es *best effort* mientras cerramos dependencias.
 
 ---
 
-## 🪟 Windows nativo (experimental)
+## ðŸªŸ Windows nativo (experimental)
 
-**Resumen rápido:**  
+**Resumen rÃ¡pido:**  
 1) Instala Npcap + Npcap SDK (ver arriba).  
 2) Abre **PowerShell como Administrador**.  
 3) Compila:
@@ -288,27 +293,27 @@ if (Test-Path $npcap) { $env:Path = "$env:Path;$npcap" }
 .\target\release\packetmancer.exe --file .\captures\tcp-ecn-sample.pcap
 ```
 
-> **Nota:** Si tu SDK no está en `C:\NpcapSDK`, define `NPCAP_SDK_DIR`:
+> **Nota:** Si tu SDK no estÃ¡ en `C:\NpcapSDK`, define `NPCAP_SDK_DIR`:
 > ```powershell
 > $env:NPCAP_SDK_DIR = "D:\SDKs\NpcapSDK"
 > ```
 
 ---
 
-## 📄 Licencia
+## ðŸ“„ Licencia
 
-Este proyecto está bajo la **Licencia MIT**.
+Este proyecto estÃ¡ bajo la **Licencia MIT**.
 
 ---
 
-## 👨‍💻 Autor
+## ðŸ‘¨â€ðŸ’» Autor
 
 **Juan Felipe Orozco Cortes**  
-📝 Blog: *La Verdad en los Paquetes*  
-💻 GitHub: [@topassky3](https://github.com/topassky3)
+ðŸ“ Blog: *La Verdad en los Paquetes*  
+ðŸ’» GitHub: [@topassky3](https://github.com/topassky3)
 
 <div align="center">
-  <sub>Construido con ❤️ y Rust 🦀</sub>
+  <sub>Construido con â¤ï¸ y Rust ðŸ¦€</sub>
 </div>
 
 
