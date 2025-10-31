@@ -1,12 +1,8 @@
 use clap::Parser;
 use serde_json::Value;
 
-mod detectors;
-mod engine;
-mod network;
-
-use detectors::tcp_health::TcpHealthDetector;
-use engine::Engine;
+// Importa desde tu crate de librería (re-exports en src/lib.rs)
+use packetmancer::{Engine, TcpHealthDetector};
 
 #[derive(Parser, Debug)]
 #[command(version, about = "PacketMancer - Analizador de Red Inteligente", long_about = None)]
@@ -15,7 +11,7 @@ struct Args {
     #[arg(short, long)]
     file: String,
 
-    /// Escribe reporte JSON en la ruta indicada (opcional)
+    /// Escribe el reporte JSON en la ruta indicada (opcional)
     #[arg(long)]
     json: Option<String>,
 

@@ -2,7 +2,6 @@ use crate::engine::Detector;
 use crate::network::flow::Flow;
 use etherparse::{InternetSlice, SlicedPacket, TransportSlice};
 use serde_json::{json, Value};
-use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::net::{IpAddr, Ipv4Addr};
 
@@ -16,12 +15,15 @@ pub struct TcpStreamState {
 
     // Heurísticas
     pub seen_seq_numbers: HashSet<u32>, // retransmisión si repite seq con payload
-    pub highest_seq_end: Option<u32>,   // mayor (seq + len) observado
+    pub seen_seq_queue: VecDeque<u32>,
+    pub highest_seq_end: Option<u32>, // mayor (seq + len) observado
 
     // DupACK
     pub last_ack_seen: Option<u32>,
     pub dup_ack_streak: u32,
     pub duplicate_ack_events: u32, // evento al llegar a 3 ACKs duplicados consecutivos
+
+    pub last_window_seen: Option<u16>,
 
     // RTT (campos internos; no exponer tipos privados)
     outstanding: VecDeque<OutstandingSegment>, // segmentos enviados pendientes de ACK
@@ -89,10 +91,18 @@ fn quantile_us(sorted_us: &[u64], q: f64) -> u64 {
     sorted_us[pos]
 }
 
-// Comparación modular de secuencias TCP (a <= b)
+// Comparación modular de secuencias TCP
 #[inline]
 fn seq_lte(a: u32, b: u32) -> bool {
     b.wrapping_sub(a) as i32 >= 0
+}
+#[inline]
+fn seq_lt(a: u32, b: u32) -> bool {
+    b.wrapping_sub(a) as i32 > 0
+}
+#[inline]
+fn seq_gt(a: u32, b: u32) -> bool {
+    a.wrapping_sub(b) as i32 > 0
 }
 
 // ----- Scoring de severidad (extraído para test) -----
@@ -112,32 +122,29 @@ fn compute_severity(
         0.0
     };
 
-    // Normalización por 1000 paquetes (evita sesgo por flows largos)
+    // Normalización por 1000 paquetes
     let pkts_k = (total_pkts as f64 / 1000.0).max(1.0);
-    let retr_k = retr as f64 / pkts_k; // retrans por 1000 pkts
-    let dup_k = dup as f64 / pkts_k; // dupACK events por 1000 pkts
-    let zwin_k = zwin as f64 / pkts_k; // zwin por 1000 pkts
+    let retr_k = retr as f64 / pkts_k;
+    let dup_k = dup as f64 / pkts_k;
+    let zwin_k = zwin as f64 / pkts_k;
 
     // Ponderación conservadora
     let score_f = 12.0 * retr_k   // retrans pesa mucho
-        + 9.0 * zwin_k            // ventana cero muy relevante
-        + 4.0 * dup_k             // dupACK pesa menos
-        + 2.0 * ooo_pct; // fuera de orden aporta poco
+        + 9.0 * zwin_k            // ventana cero
+        + 4.0 * dup_k             // dupACK
+        + 2.0 * ooo_pct; // OOO aporta poco
 
     let mut score = score_f.round() as u32;
 
-    // Razones legibles
     let mut reasons = Vec::<String>::new();
     if retr >= 20 {
         reasons.push(format!("retransmisiones altas ({retr})"));
     } else if retr >= 5 {
         reasons.push(format!("retransmisiones moderadas ({retr})"));
     }
-
     if zwin >= 1 {
         reasons.push(format!("ventana cero ({zwin})"));
     }
-
     if dup >= 3 {
         if retr == 0 && zwin == 0 {
             reasons.push(format!("muchos dupACK sin retransmisiones ({dup})"));
@@ -145,12 +152,10 @@ fn compute_severity(
             reasons.push(format!("eventos de ACK duplicado (≥3) ({dup})"));
         }
     }
-
     if ooo_pct > 2.0 {
         reasons.push(format!("fuera de orden {ooo_pct:.1}% (~{ooo})"));
     }
 
-    // Gating: no subir a ALTA si no hay señales “fuertes”
     let mut level = if score >= 120 || retr >= 20 || zwin >= 2 {
         "ALTA"
     } else if score >= 50 || retr >= 5 || zwin >= 1 || dup >= 5 || ooo_pct > 2.0 {
@@ -159,15 +164,48 @@ fn compute_severity(
         "BAJA"
     };
 
-    // Cap adicional: si hay muy pocas retrans y nada de zwin, bajar a MEDIA
+    // Cap adicional: pocas retrans y sin zwin => bajar a MEDIA
     if level == "ALTA" && retr < 3 && zwin == 0 {
         level = "MEDIA";
         if score > 80 {
             score = 80;
-        } // reflejar el cap en el score
+        }
     }
 
     (score, level, reasons)
+}
+
+const SEEN_WINDOW_BYTES: u64 = 16 * 1024 * 1024; // 16 MiB
+const SEEN_MAX_TRACKED: usize = 200_000;
+
+#[inline]
+fn seq_distance_forward(from: u32, to: u32) -> u64 {
+    if seq_lte(from, to) {
+        (to.wrapping_sub(from)) as u64
+    } else {
+        ((to as u64) + (1u64 << 32)) - (from as u64)
+    }
+}
+
+fn maintain_seen_window(stream: &mut TcpStreamState) {
+    if let Some(max_end) = stream.highest_seq_end {
+        while let Some(&front) = stream.seen_seq_queue.front() {
+            if seq_distance_forward(front, max_end) > SEEN_WINDOW_BYTES {
+                stream.seen_seq_queue.pop_front();
+                stream.seen_seq_numbers.remove(&front);
+            } else {
+                break;
+            }
+        }
+    }
+    if stream.seen_seq_numbers.len() > SEEN_MAX_TRACKED {
+        let drop = stream.seen_seq_numbers.len() / 4;
+        for _ in 0..drop {
+            if let Some(x) = stream.seen_seq_queue.pop_front() {
+                stream.seen_seq_numbers.remove(&x);
+            }
+        }
+    }
 }
 
 impl TcpHealthDetector {
@@ -199,22 +237,33 @@ impl TcpHealthDetector {
         flags: TcpFlags,
         ts_us: u64,
     ) {
+        let mut is_retx = false;
+
         // Retransmisión (mismo seq con payload; ignora SYN/FIN)
-        if payload_len > 0 && stream.seen_seq_numbers.contains(&seq_num) && !flags.syn && !flags.fin
+        if payload_len > 0
+            && stream.seen_seq_numbers.contains(&seq_num)
+            && !flags.syn
+            && !flags.fin
+            && !flags.rst
         {
             stream.retransmission_count += 1;
+            is_retx = true;
         }
-        stream.seen_seq_numbers.insert(seq_num);
 
-        // OOO vs highest end
+        // COLAPSADO: evita clippy::collapsible-if
+        if payload_len > 0 && !is_retx && stream.seen_seq_numbers.insert(seq_num) {
+            stream.seen_seq_queue.push_back(seq_num);
+        }
+
         if payload_len > 0 {
             let seg_end = seq_num.wrapping_add(payload_len as u32);
             match stream.highest_seq_end {
                 Some(max_end) => {
-                    if seq_num < max_end {
+                    // OOO solo si NO es retransmisión
+                    if !is_retx && seq_lt(seq_num, max_end) {
                         stream.out_of_order_count += 1;
                     }
-                    if seg_end > max_end {
+                    if seq_gt(seg_end, max_end) {
                         stream.highest_seq_end = Some(seg_end);
                     }
                 }
@@ -226,6 +275,9 @@ impl TcpHealthDetector {
                 seq_end: seg_end,
                 ts_us,
             });
+
+            // Mantener ventana de seq vistos tras actualizar high-water
+            maintain_seen_window(stream);
         }
     }
 
@@ -259,23 +311,30 @@ impl TcpHealthDetector {
             stream.zero_window_events += 1;
         }
 
+        // --- dupACK con ventana INVARIABLE ---
+        // Compara contra lo último visto ANTES de actualizar
+        let same_ack = stream.last_ack_seen.is_some_and(|x| x == ack_num);
+        let same_win = stream.last_window_seen.is_some_and(|w| w == window_size);
+
         // ACKs duplicados (evento al llegar a 3 consecutivos) cuando no hay payload
         if payload_len == 0 && flags.ack && !flags.syn && !flags.fin && !flags.rst {
-            match stream.last_ack_seen {
-                Some(last) if last == ack_num => {
-                    stream.dup_ack_streak += 1;
-                    if stream.dup_ack_streak == 3 {
-                        stream.duplicate_ack_events += 1;
-                    }
+            if same_ack && same_win {
+                stream.dup_ack_streak += 1;
+                if stream.dup_ack_streak == 3 {
+                    stream.duplicate_ack_events += 1;
                 }
-                _ => {
-                    stream.last_ack_seen = Some(ack_num);
-                    stream.dup_ack_streak = 1;
-                }
+            } else {
+                // Nuevo valor "base" para comparar siguientes dupACK
+                stream.last_ack_seen = Some(ack_num);
+                stream.last_window_seen = Some(window_size);
+                stream.dup_ack_streak = 1;
             }
         } else {
             stream.dup_ack_streak = 0;
         }
+
+        // Siempre registrar la última ventana observada (para el próximo paquete)
+        stream.last_window_seen = Some(window_size);
 
         // DATA path (incluye heurísticas y registrar outstanding)
         Self::on_data(stream, seq_num, payload_len, flags, ts_us);
@@ -390,12 +449,40 @@ impl Detector for TcpHealthDetector {
             })
             .collect();
 
-        by_severity.sort_by_key(|v| Reverse(v["score"]["value"].as_u64().unwrap_or(0)));
+        // Orden estable: score desc, luego flow asc (desempate)
+        by_severity.sort_by(|a, b| {
+            let sa = a["score"]["value"].as_i64().unwrap_or(0);
+            let sb = b["score"]["value"].as_i64().unwrap_or(0);
+            sb.cmp(&sa).then_with(|| {
+                let fa = a["flow"].as_str().unwrap_or("");
+                let fb = b["flow"].as_str().unwrap_or("");
+                fa.cmp(fb)
+            })
+        });
 
         // Top por volumen (paquetes)
         let mut by_packets: Vec<&TcpConversationState> = convs.clone();
-        by_packets
-            .sort_by_key(|st| Reverse(st.c2s.packet_count.saturating_add(st.s2c.packet_count)));
+        by_packets.sort_by(|x, y| {
+            let sx = x.c2s.packet_count.saturating_add(x.s2c.packet_count);
+            let sy = y.c2s.packet_count.saturating_add(y.s2c.packet_count);
+            sy.cmp(&sx).then_with(|| {
+                // Desempate lexicográfico estable por 4-tupla del flow
+                let kx = (
+                    x.flow.source_ip.to_string(),
+                    x.flow.source_port,
+                    x.flow.destination_ip.to_string(),
+                    x.flow.destination_port,
+                );
+                let ky = (
+                    y.flow.source_ip.to_string(),
+                    y.flow.source_port,
+                    y.flow.destination_ip.to_string(),
+                    y.flow.destination_port,
+                );
+                kx.cmp(&ky)
+            })
+        });
+
         let by_packets_json: Vec<Value> = by_packets
             .into_iter()
             .map(|st| {
@@ -526,5 +613,134 @@ mod tests {
         assert!(p95 >= 119.0 && p95 <= 121.0, "p95={p95}");
         assert_eq!(c2s.rtt.count, 1);
         assert!(s2c.rtt.count == 0);
+    }
+
+    #[test]
+    fn ooo_respects_wraparound_forward_progress() {
+        // max_end cerca del final del espacio de 32 bits
+        let mut s = TcpStreamState::default();
+        let f = f_ack();
+
+        // Primer segmento: seq=0xFFFF_FF00, len=300 => end=0x0000002C (wrap)
+        TcpHealthDetector::update_stream(&mut s, 0xFFFF_FF00, 0, 1024, 300, f, 0);
+        let max_end = s.highest_seq_end.expect("debió setear max_end");
+        // Debe haber avanzado y NO contar OOO
+        assert_eq!(s.out_of_order_count, 0);
+
+        // Segundo segmento: continúa después del wrap (seq=0x0000002C, len=100)
+        TcpHealthDetector::update_stream(&mut s, 0x0000_002C, 0, 1024, 100, f, 1);
+        // No debe contarse como OOO y debe avanzar el max_end modularmente
+        assert_eq!(s.out_of_order_count, 0);
+        assert!(super::seq_gt(s.highest_seq_end.unwrap(), max_end));
+    }
+
+    #[test]
+    fn ooo_counts_when_segment_is_behind_across_wrap() {
+        let mut s = TcpStreamState::default();
+        let f = f_ack();
+
+        // Primer segmento "moderno": seq pequeño tras wrap, end pequeño (p.ej., seq=20, len=20 => end=40)
+        TcpHealthDetector::update_stream(&mut s, 20, 0, 1024, 20, f, 0);
+        let max_end = s.highest_seq_end.unwrap();
+        assert_eq!(max_end, 40);
+
+        // Ahora llega un segmento "antiguo" antes del wrap (ej. seq=0xFFFF_FF00, len=50)
+        TcpHealthDetector::update_stream(&mut s, 0xFFFF_FF00, 0, 1024, 50, f, 1);
+
+        // Debe contarse como OOO (está por detrás del high-water mark en sentido modular)
+        assert_eq!(s.out_of_order_count, 1);
+    }
+
+    #[test]
+    fn ooo_is_not_counted_for_retransmissions() {
+        let mut s = TcpStreamState::default();
+        let f = f_ack();
+
+        // Primer envío
+        TcpHealthDetector::update_stream(&mut s, 10_000, 0, 1024, 500, f, 0);
+        // Avanza high-water
+        TcpHealthDetector::update_stream(&mut s, 10_500, 0, 1024, 100, f, 1);
+        // Retrans del primero: mismo seq
+        TcpHealthDetector::update_stream(&mut s, 10_000, 0, 1024, 500, f, 2);
+
+        assert_eq!(s.retransmission_count, 1);
+        assert_eq!(s.out_of_order_count, 0, "no debe contar OOO en retrans");
+    }
+
+    fn f_ack_rst() -> TcpFlags {
+        TcpFlags {
+            syn: false,
+            fin: false,
+            rst: true,
+            ack: true,
+        }
+    }
+
+    #[test]
+    fn retransmission_ignored_when_rst() {
+        let mut s = TcpStreamState::default();
+        let f = f_ack_rst();
+        // Mismo seq con payload, pero con RST => NO cuenta como retrans
+        TcpHealthDetector::update_stream(&mut s, 1000, 0, 1024, 100, f, 0);
+        TcpHealthDetector::update_stream(&mut s, 1000, 0, 1024, 100, f, 10);
+        assert_eq!(s.retransmission_count, 0);
+    }
+
+    #[test]
+    fn dupack_resets_when_window_changes() {
+        let mut s = TcpStreamState::default();
+        // tres ACKs duplicados con misma ventana => evento
+        TcpHealthDetector::update_stream(&mut s, 1, 5000, 4096, 0, f_ack(), 0);
+        TcpHealthDetector::update_stream(&mut s, 2, 5000, 4096, 0, f_ack(), 1);
+        TcpHealthDetector::update_stream(&mut s, 3, 5000, 4096, 0, f_ack(), 2);
+        assert_eq!(s.duplicate_ack_events, 1);
+
+        // ahora cambia la ventana => reinicia streak, no suma evento
+        TcpHealthDetector::update_stream(&mut s, 4, 5000, 8192, 0, f_ack(), 3);
+        assert_eq!(s.dup_ack_streak, 1);
+        assert_eq!(s.duplicate_ack_events, 1);
+    }
+
+    #[test]
+    fn severity_retr_5_is_media_with_reason() {
+        // retr >= 5 => MEDIA y razón "retransmisiones moderadas"
+        let mut c2s = TcpStreamState::default();
+        let f = f_ack();
+        // Envío inicial
+        TcpHealthDetector::update_stream(&mut c2s, 1_000, 0, 1024, 100, f, 0);
+        // 5 retransmisiones del mismo seq con payload
+        for i in 0..5 {
+            TcpHealthDetector::update_stream(&mut c2s, 1_000, 0, 1024, 100, f, 10 + i);
+        }
+        let s2c = TcpStreamState::default();
+        let (_score, level, reasons) = super::compute_severity(&c2s, &s2c);
+        assert_eq!(level, "MEDIA");
+        assert!(reasons
+            .iter()
+            .any(|r| r.contains("retransmisiones moderadas")));
+    }
+
+    #[test]
+    fn severity_zwin_1_is_media_with_reason() {
+        // zwin >= 1 => MEDIA y razón "ventana cero"
+        let mut s = TcpStreamState::default();
+        TcpHealthDetector::update_stream(&mut s, 1000, 0, 0, 0, f_ack(), 0);
+        let (_score, level, reasons) = super::compute_severity(&s, &TcpStreamState::default());
+        assert_eq!(level, "MEDIA");
+        assert!(reasons.iter().any(|r| r.contains("ventana cero")));
+    }
+
+    #[test]
+    fn severity_ooo_exactly_2pct_is_baja_and_above_is_media() {
+        // 2.0% exacto => BAJA; >2.0% => MEDIA
+        let mut a = TcpStreamState::default();
+        a.packet_count = 100;
+        a.out_of_order_count = 2; // 2%
+        let (_s, l, _r) = super::compute_severity(&a, &TcpStreamState::default());
+        assert_eq!(l, "BAJA");
+
+        a.out_of_order_count = 3; // 3%
+        let (_s2, l2, _r2) = super::compute_severity(&a, &TcpStreamState::default());
+        assert_eq!(l2, "MEDIA");
     }
 }
